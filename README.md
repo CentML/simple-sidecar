@@ -1,88 +1,214 @@
-# kube-sidecar-injector
+# Simple Sidecar 
 
-This repo is used for [a tutorial at Medium](https://medium.com/ibm-cloud/diving-into-kubernetes-mutatingadmissionwebhook-6ef3c5695f74) to create a Kubernetes [MutatingAdmissionWebhook](https://kubernetes.io/docs/admin/admission-controllers/#mutatingadmissionwebhook-beta-in-19) that injects a nginx sidecar container into pod prior to persistence of the object.
+This repo was originally forked from [morvencao's kube-sidecar-injector](https://github.com/morvencao/kube-sidecar-injector). It's been productionized and turned into a simple generic Kubernetes sidecar injector (using a [Kubernetes MutatingAdmissionWebhook](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#mutatingadmissionwebhook)).
 
-## Prerequisites
 
-- [git](https://git-scm.com/downloads)
-- [go](https://golang.org/dl/) version v1.17+
-- [docker](https://docs.docker.com/install/) version 19.03+
-- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/) version v1.19+
-- Access to a Kubernetes v1.19+ cluster with the `admissionregistration.k8s.io/v1` API enabled. Verify that by the following command:
+## Quick Start 
 
-```
-kubectl api-versions | grep admissionregistration.k8s.io
-```
-The result should be:
-```
-admissionregistration.k8s.io/v1
-admissionregistration.k8s.io/v1beta1
+You will need a certificate for the [mutating admission webhook](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#mutatingadmissionwebhook) that powers simple-sidecar. It is recommended that you use [Certificate Manager's CA Injector functionality](https://cert-manager.io/docs/concepts/ca-injector/) for a serious deployment as certificates inevitably expire and need to be replaced.  For this quickstart we're just going to use openssl cli. 
+
+
+Some configuration we'll use:
+
+```sh
+NAMESPACE=simple-sidecar # helm chart default value
+TLS_SECRET_NAME=simple-sidecar-tls #helm chart default value
+SERVICE_NAME=simple-sidecar # the helm chart default name
 ```
 
-> Note: In addition, the `MutatingAdmissionWebhook` and `ValidatingAdmissionWebhook` admission controllers should be added and listed in the correct order in the admission-control flag of kube-apiserver.
+Create the namespace in kubectl if it doesn't already exist:
 
-## Build and Deploy
-
-1. Build and push docker image:
-
-```bash
-make docker-build docker-push IMAGE=quay.io/<your_quayio_username>/sidecar-injector:latest
+```sh
+kubectl create ns $NAMESPACE
 ```
 
-2. Deploy the kube-sidecar-injector to kubernetes cluster:
+Generate the certificates:
 
-```bash
-make deploy IMAGE=quay.io/<your_quayio_username>/sidecar-injector:latest
+```sh
+cd examples
+./certs.sh $NAMESPACE $TLS_SECRET_NAME $SERVICE_NAME
 ```
 
-3. Verify the kube-sidecar-injector is up and running:
-
-```bash
-# kubectl -n sidecar-injector get pod
-# kubectl -n sidecar-injector get pod
-NAME                                READY   STATUS    RESTARTS   AGE
-sidecar-injector-7c8bc5f4c9-28c84   1/1     Running   0          30s
+Create the secrets using the command printed:
+```sh
+kubectl create secret generic simple-sidecar --from-file=tls.crt=server.crt --from-file=tls.key=server.key --from-file=ca.crt=ca.crt --namespace simple-sidecar
 ```
 
-## How to use
 
-1. Create a new namespace `test-ns` and label it with `sidecar-injector=enabled`:
+Create a values.yaml for the helm installation, use the caBundle provided by the cert.sh script:
 
-```
-# kubectl create ns test-ns
-# kubectl label namespace test-ns sidecar-injection=enabled
-# kubectl get namespace -L sidecar-injection
-NAME                 STATUS   AGE   SIDECAR-INJECTION
-default              Active   26m
-test-ns              Active   13s   enabled
-kube-public          Active   26m
-kube-system          Active   26m
-sidecar-injector     Active   17m
-```
 
-2. Deploy an app in Kubernetes cluster, take `alpine` app as an example
+```yaml
+caBundle: <YOUR BUNDLE HERE>
 
-```bash
-kubectl -n test-ns run alpine \
-    --image=alpine \
-    --restart=Never \
-    --command -- sleep infinity
+simpleSidecarConfig:
+  ubuntu: 
+    containers:
+    - args:
+      - -c
+      - sleep infinity
+      command:
+      - /bin/sh
+      image: ubuntu
+      name: ubuntu
 ```
 
-3. Verify sidecar container is injected:
 
-```
-# kubectl -n test-ns get pod
-NAME                     READY     STATUS        RESTARTS   AGE
-alpine                   2/2       Running       0          10s
-# kubectl -n test-ns get pod alpine -o jsonpath="{.spec.containers[*].name}"
-alpine sidecar-nginx
+Install the helm chart:
+
+```sh
+helm install simple-sidecar ./charts/simple-sidecar -f values.yaml
 ```
 
-## Troubleshooting
+Let's injected the ubuntu container into another container. First we need to create (or update) a namespace with the sidecar-injection label set to true:
 
-Sometimes you may find that pod is injected with sidecar container as expected, check the following items:
+```sh
+kubectl apply -f - << EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    sidecar-injection: enabled
+  name: injectable
+EOF
+```
 
-1. The sidecar-injector pod is in running state and no error logs.
-2. The namespace in which application pod is deployed has the correct labels(`sidecar-injector=enabled`) as configured in `mutatingwebhookconfiguration`.
-3. Check if the application pod has annotation `sidecar-injector-webhook.morven.me/inject:"yes"`.
+Now let's create a pod with the `simple-sidecar.centml.ai/inject` annotation pointing to the ubuntu pod we've configured:
+
+
+```sh
+kubectl apply -f - << EOF
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-pod
+  namespace: injectable
+  annotations:
+    simple-sidecar.centml.ai/inject: "ubuntu"
+spec:
+  containers:
+  - name: curl-container
+    image: curlimages/curl
+    command: ["/bin/sleep"]
+    args: ["infinity"]
+EOF
+```
+
+You should now have a ubuntu pod injected in your curl pod: 
+
+```sh
+kubectl get pod my-pod -n injectable -o jsonpath='{.spec.containers}' | jq
+```
+
+```json
+[
+   {
+      "args":[
+         "infinity"
+      ],
+      "command":[
+         "/bin/sleep"
+      ],
+      "image":"curlimages/curl",
+      "imagePullPolicy":"Always",
+      "name":"curl-container",
+    ...
+   {
+      "args":[
+         "-c",
+         "sleep infinity"
+      ],
+      "command":[
+         "/bin/sh"
+      ],
+      "image":"ubuntu",
+      "imagePullPolicy":"Always",
+      "name":"ubuntu",
+   ...
+   }
+]
+```
+
+## Configuring side cars
+
+The easiest way to learn what can be configured is to look at the Config struct in pkg/webhook/webhook.go
+
+```sh
+go doc -all
+```
+
+Look for:
+```txt
+type Config struct {
+
+	// InitContainers - inject one or more initContainers into the pod spec.
+	InitContainers []corev1.Container
+
+	// Containers - inject one or more containers into the pod spec.
+	Containers []corev1.Container
+
+	// ExistingContainerConfig - configuration for injecting into the pre-existing containers.
+	ExistingContainerConfig
+}
+    Config is the struct used to parse injection config items for Simple
+    Sidecar. The InitContainers, Containers, Volumes, and EnvVars fields are
+    arrays of Kubernetes objects that will be added to the pod spec.
+
+type ExistingContainerConfig struct {
+	// Volumes - inject one or more volumes into pre-existing pod specs.
+	Volumes []corev1.Volume
+
+	// EnvVars - inject one or more environment variables into pre-existing container specs.
+	EnvVars []corev1.EnvVar
+
+	// VolumeMounts - inject one or more volume mounts into pre-existing container specs.
+	// BEFORE sidecar injection.
+	VolumeMounts []corev1.VolumeMount
+}
+    ExistingContainerConfig provides configuration for injecting into the
+    pre-existing containers. This is useful for utilizing the functionality of
+    injected containers
+
+```
+
+The fields of these Config structs are imported from the kubernetes go source itself. So the syntax perfectly matches if you were defining a container etc by hand using yaml. You can check out the source [here](https://github.com/kubernetes/api/blob/master/core/v1/types.go). 
+
+
+### Basic Config
+
+
+Define a config type in your values.yaml:
+
+```yaml
+mytype:
+  containers:
+  - args:
+      - -c
+      - sleep infinity
+      command:
+      - /bin/sh
+      image: ubuntu
+      name: ubuntu  
+```
+
+In order to use the 'mytype' injection:
+
+    1) Create or update a namespace with the 'sidecar-injection: enabled' *label*.
+    2) Create a pod in this namespace with the 'simple-sidecar.centml.ai: mytype' annotation. 
+
+That's it. Define as many configurations as you like with either containers or initContainers 
+
+### Advanced Config
+
+You can also inject things like:
+  1) volumes into the existing pods
+  2) environment variables, volume mounents into the pre-existing containers
+
+This let's you leverage functionality that might be provided by your injected containers. 
+
+## Using cert-manager's CA Injector
+
+Follow the documentation related to [installing cert-manager](https://cert-manager.io/docs/) and then using it's [CA Injector functionality](https://cert-manager.io/docs/concepts/ca-injector/. 
+
+Setup a [self signed certificate](https://cert-manager.io/docs/configuration/selfsigned/) which will auto update to the secret location you've configured simple-sidecar to use. 
+

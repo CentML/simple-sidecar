@@ -1,0 +1,6 @@
+  containers:
+  - name: ubuntu
+    image: ubuntu:latest
+    command: ["/bin/bash"]
+    args: ["-c", "while true; do echo 'Hello, Kubernetes!'; sleep 5; done"]
+    

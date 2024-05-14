@@ -1,0 +1,15 @@
+caBundle: <see README.md for how to generate this value>
+
+simpleSidecarConfig:
+  ubuntu: 
+    containers:
+    - args:
+      - -c
+      - sleep infinity
+      command:
+      - /bin/sh
+      image: ubuntu
+
+      name: ubuntu
+
+  

@@ -1,5 +1,5 @@
 # Build the sidecar-injector binary
-FROM golang:1.17 as builder
+FROM golang:1.21 as builder
 
 WORKDIR /workspace
 # Copy the Go Modules manifests
@@ -11,9 +11,10 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/ cmd/
+COPY pkg/ pkg/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o sidecar-injector ./cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${BUILDPLATFORM} go build -a -o simple-sidecar ./cmd
 
 
 FROM alpine:latest
@@ -24,11 +25,8 @@ RUN apk --no-cache add curl
 WORKDIR /
 
 # install binary
-COPY --from=builder /workspace/sidecar-injector .
-
-# install the prestop script
-COPY ./prestop.sh .
+COPY --from=builder /workspace/simple-sidecar .
 
 USER 65532:65532
 
-ENTRYPOINT ["/sidecar-injector"]
+ENTRYPOINT ["/simple-sidecar"]

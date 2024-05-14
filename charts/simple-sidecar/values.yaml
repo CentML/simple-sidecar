@@ -1,0 +1,38 @@
+replicaCount: 1
+
+name: simple-sidecar
+
+namespace: simple-sidecar
+
+serviceName: simple-sidecar
+
+tlsSecretName: simple-sidecar-tls
+
+simpleSidecarConfig:
+  ubuntu: 
+    containers:
+    - args:
+      - -c
+      - sleep infinity
+      command:
+      - /bin/sh
+      image: ubuntu
+      name: ubuntu
+
+
+mutatingWebhookConfiguration:
+  annotations: {}
+
+# standard annotations and labels
+commonLabels: {}
+
+podLabels: {}
+
+image:
+  # -- Image repository
+  # TODO Temporary personal repo
+  repository: gflarity/simple-sidecar
+  # -- Image tag
+  tag: 0.1.0
+  # -- Image pull policy for the deployment
+  imagePullPolicy: Always

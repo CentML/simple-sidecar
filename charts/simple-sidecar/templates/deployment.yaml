@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app:  {{ .Values.name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.name }}
+    spec:
+      serviceAccountName: {{ .Values.name }}
+      containers:
+        - name: {{ .Values.name }}
+          image: {{- printf " %s:%s" .Values.image.repository  .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.imagePullPolicy }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: CONFIG_FILE
+              value: /etc/webhook/config/sidecarconfig.yaml
+            - name: SERVICE_NAME
+              value: {{ .Values.name }}
+            - name: PORT
+              value: "8443"
+            - name: CERT_FILE
+              value: /etc/webhook/certs/tls.crt
+            - name: KEY_FILE
+              value: /etc/webhook/certs/tls.key
+            - name: CA_BUNDLE
+              value: /etc/webhook/certs/ca.crt
+          volumeMounts:
+          - name: webhook-config
+            mountPath: /etc/webhook/config
+          - name: simple-sidecar-tls
+            mountPath: /etc/webhook/certs
+      volumes:
+        - name: webhook-config
+          configMap:
+            name: {{ .Values.name }}
+        - name: simple-sidecar-tls
+          secret:
+            secretName: {{ .Values.tlsSecretName }}
