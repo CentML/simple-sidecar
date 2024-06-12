@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  simple-sidecar:
+  - apiVersion: v2
+    appVersion: 1.0.2
+    created: "2024-06-12T20:01:18.610339308Z"
+    description: A Helm chart for Simple Sidecar (githhub.com/CentML/simple-sidecar)
+    digest: d9ebf859111c8588b290e606b401638fdb0661df100778d0bed72b0e4ec55c51
+    name: simple-sidecar
+    type: application
+    urls:
+    - https://github.com/CentML/simple-sidecar/releases/download/simple-sidecar-helm-chart-1.0.2/simple-sidecar-1.0.2.tgz
+    version: 1.0.2
+generated: "2024-06-12T20:01:18.610350209Z"
