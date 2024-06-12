@@ -27,7 +27,6 @@ mutatingWebhookConfiguration:
 
 image:
   # -- Image repository
-  # TODO Temporary personal repo
   repository: ghcr.io/centml/simple-sidecar
   # -- Image tag
   tag: v1.0.2
