@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # This job runs only if the tag_name starts with 'v', this avoids conflicts with helm
+    # chart releases which have simple-sidecar-helm-chart-{{ .Version }} as the release name    
+    if: startsWith(github.event.release.tag_name, 'v')
 
     steps:
       - name: Checkout code
@@ -33,14 +36,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
+      - name: Convert repository name to lowercase
+        id: lowercase_repo
+        run: echo "::set-output name=lower_repo::$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')"
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
+            ghcr.io/${{ steps.lowercase_repo.outputs.lower_repo }}:latest
+            ghcr.io/${{ steps.lowercase_repo.outputs.lower_repo }}:${{ github.event.release.tag_name }}
           platforms: linux/amd64,linux/arm64
 
       - name: Logout from GitHub Container Registry
