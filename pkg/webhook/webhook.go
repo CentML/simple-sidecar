@@ -192,45 +192,57 @@ func (whs *WebhookServer) mutationRequired(ignoredList []string, metadata *metav
 
 // addContainer adds the container to the target containers
 func (whs *WebhookServer) addContainer(target, added []corev1.Container, basePath string) (patch []patchOperation) {
-	first := len(target) == 0
-	var value interface{}
-	for _, add := range added {
-		value = add
-		path := basePath
-		if first {
-			first = false
-			value = []corev1.Container{add}
-		} else {
-			path = path + "/-"
-		}
+
+	// if there's nothing to add, then return
+	if len(added) == 0 {
+		return patch
+	}
+
+	if len(target) == 0 {
+		// If the target array is empty, add an empty array to the base path first
 		patch = append(patch, patchOperation{
 			Op:    "add",
-			Path:  path,
-			Value: value,
+			Path:  basePath,
+			Value: []corev1.Container{},
+		})
+	}
+	for _, add := range added {
+		patch = append(patch, patchOperation{
+			Op:    "add",
+			Path:  basePath + "/-",
+			Value: add,
 		})
 	}
 	return patch
 }
 
-// addVolume to the target list of volumes
-func (whs *WebhookServer) addVolume(target, added []corev1.Volume, basePath string) (patch []patchOperation) {
-	first := len(target) == 0
-	var value interface{}
-	for _, add := range added {
-		value = add
-		path := basePath
-		if first {
-			first = false
-			value = []corev1.Volume{add}
-		} else {
-			path = path + "/-"
-		}
-		patch = append(patch, patchOperation{
-			Op:    "add",
-			Path:  path,
-			Value: value,
-		})
+// addVolume adds the specified volumes to the target list of volumes
+func (whs *WebhookServer) addVolume(target []corev1.Volume, added []corev1.Volume, basePath string) (patch []patchOperation) {
+
+	// if there's nothing to add, then return
+	if len(added) == 0 {
+		return patch
 	}
+
+	if len(target) == 0 {
+		// Create an add operation to initialize volumes with an empty array
+		initOp := patchOperation{
+			Op:    "add",
+			Path:  basePath,
+			Value: []corev1.Volume{},
+		}
+		patch = append(patch, initOp)
+	}
+
+	for _, add := range added {
+		op := patchOperation{
+			Op:    "add",
+			Path:  basePath + "/-",
+			Value: add,
+		}
+		patch = append(patch, op)
+	}
+
 	return patch
 }
 
@@ -257,10 +269,25 @@ func (whs *WebhookServer) updateAnnotation(target map[string]string, added map[s
 	return patch
 }
 
-// addVolumeMounts adds volume mounts to the containers in the give pod
+// addVolumeMounts adds volume mounts to the containers in the given pod
 func (whs *WebhookServer) addVolumeMounts(pod *corev1.Pod, vms []corev1.VolumeMount) (patch []patchOperation) {
-	// add the volumeMount and for the existing containers
-	for i, _ := range pod.Spec.Containers {
+
+	// if there's nothing to add, then return
+	if len(vms) == 0 {
+		return patch
+	}
+
+	for i := range pod.Spec.Containers {
+		// Check if volumeMounts field exists and is not empty for the container
+		if len(pod.Spec.Containers[i].VolumeMounts) == 0 {
+			// Create an add operation to initialize volumeMounts with an empty array
+			initOp := patchOperation{
+				Op:    "add",
+				Path:  fmt.Sprintf("/spec/containers/%d/volumeMounts", i),
+				Value: []corev1.VolumeMount{},
+			}
+			patch = append(patch, initOp)
+		}
 		for _, vm := range vms {
 
 			op := patchOperation{
@@ -277,16 +304,16 @@ func (whs *WebhookServer) addVolumeMounts(pod *corev1.Pod, vms []corev1.VolumeMo
 // addEnvVars adds environment variables to the containers in the given pod
 func (whs *WebhookServer) addEnvVars(pod *corev1.Pod, envVars []corev1.EnvVar) (patch []patchOperation) {
 
-	// no env vars to add, short circuit
+	// no env vars to add, return
 	if len(envVars) == 0 {
 		return patch
 	}
 
-	// add the volumeMount for the existing containers
-	for i, _ := range pod.Spec.Containers {
+	// add the envVar for the existing containers
+	for i := range pod.Spec.Containers {
 
 		// Add an empty env field first if it doesn't exist
-		if pod.Spec.Containers[i].Env == nil {
+		if len(pod.Spec.Containers[i].Env) == 0 {
 			op := patchOperation{
 				Op:    "add",
 				Path:  fmt.Sprintf("/spec/containers/%d/env", i),
