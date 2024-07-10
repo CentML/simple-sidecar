@@ -397,9 +397,9 @@ func TestAddVolumeWithExistingVolumes(t *testing.T) {
 	assert.Equal(t, "new-volume", addedVolume.Name, "Expected 'new-volume' name")
 }
 
-// TestUpdateAnnotationWithExistingAnnotations tests the updateAnnotation method of the WebhookServer struct.
+// TestUpdateAnnotationsWithSingleExistingAnnotations tests the updateAnnotation method of the WebhookServer struct.
 // It verifies that the method correctly handles the case where annotations are already present in the target pod.
-func TestUpdateAnnotationWithExistingAnnotations(t *testing.T) {
+func TestUpdateAnnotationsWithSingleExistingAnnotations(t *testing.T) {
 	whs := &WebhookServer{}
 
 	target := map[string]string{
@@ -410,7 +410,7 @@ func TestUpdateAnnotationWithExistingAnnotations(t *testing.T) {
 		"existing-annotation": "new-value",
 	}
 
-	patch := whs.updateAnnotation(target, added)
+	patch := whs.updateAnnotations(target, added)
 
 	assert.Equal(t, 1, len(patch), "Expected 1 patch operation")
 	assert.Equal(t, "replace", patch[0].Op, "Expected 'replace' operation")
@@ -419,6 +419,75 @@ func TestUpdateAnnotationWithExistingAnnotations(t *testing.T) {
 	newValue, ok := patch[0].Value.(string)
 	assert.True(t, ok, "Expected string value")
 	assert.Equal(t, "new-value", newValue, "Expected 'new-value'")
+}
+
+// TestUpdateAnnotationsWithNilTarget tests the updateAnnotation method of the WebhookServer struct.
+// It verifies that the method correctly handles the case where the target annotations map is nil.
+func TestUpdateAnnotationsWithNilTarget(t *testing.T) {
+	whs := &WebhookServer{}
+
+	var target map[string]string = nil
+
+	added := map[string]string{
+		"new-annotation": "new-value",
+	}
+
+	patch := whs.updateAnnotations(target, added)
+
+	assert.Equal(t, 2, len(patch), "Expected 2 patch operations")
+	assert.Equal(t, "add", patch[0].Op, "Expected 'add' operation")
+	assert.Equal(t, "/metadata/annotations", patch[0].Path, "Expected '/metadata/annotations' path")
+
+	annotationsMap, ok := patch[0].Value.(map[string]string)
+	assert.True(t, ok, "Expected map[string]string value")
+	assert.Equal(t, 0, len(annotationsMap), "Expected empty map")
+
+	assert.Equal(t, "add", patch[1].Op, "Expected 'add' operation")
+	assert.Equal(t, "/metadata/annotations/new-annotation", patch[1].Path, "Expected '/metadata/annotations/new-annotation' path")
+
+	newValue, ok := patch[1].Value.(string)
+	assert.True(t, ok, "Expected string value")
+	assert.Equal(t, "new-value", newValue, "Expected 'new-value'")
+}
+
+// TestUpdateAnnotationsWithNonNilTargetAndExistingAnnotations tests the updateAnnotation method of the WebhookServer struct.
+// It verifies that the method correctly handles the case where annotations are already present in the target pod.
+func TestUpdateAnnotationsWithNonNilTargetAndExistingAnnotations(t *testing.T) {
+	whs := &WebhookServer{}
+
+	target := map[string]string{
+		"existing-annotation": "existing-value",
+		"another-annotation":  "another-value",
+	}
+
+	added := map[string]string{
+		"existing-annotation": "new-value",
+		"new-annotation":      "new-value",
+	}
+
+	patch := whs.updateAnnotations(target, added)
+
+	assert.Equal(t, 2, len(patch), "Expected 2 patch operations")
+
+	expectedPatches := map[string]patchOperation{
+		"/metadata/annotations/existing-annotation": {
+			Op:    "replace",
+			Path:  "/metadata/annotations/existing-annotation",
+			Value: "new-value",
+		},
+		"/metadata/annotations/new-annotation": {
+			Op:    "add",
+			Path:  "/metadata/annotations/new-annotation",
+			Value: "new-value",
+		},
+	}
+
+	for _, p := range patch {
+		expectedPatch, exists := expectedPatches[p.Path]
+		assert.True(t, exists, "Unexpected patch path: %s", p.Path)
+		assert.Equal(t, expectedPatch.Op, p.Op, "Unexpected operation for path: %s", p.Path)
+		assert.Equal(t, expectedPatch.Value, p.Value, "Unexpected value for path: %s", p.Path)
+	}
 }
 
 // Test case: Verify addVolumeMounts adds volume mounts to containers in a pod,
@@ -597,7 +666,8 @@ func TestCreatePatch(t *testing.T) {
 
 		{Op: "add", Path: "/spec/containers/-", Value: corev1.Container{Name: "sidecar-container", Image: "sidecar-image"}},
 		{Op: "add", Path: "/spec/volumes/-", Value: corev1.Volume{Name: "sidecar-volume", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}}},
-		{Op: "add", Path: "/metadata/annotations", Value: annotations},
+		{Op: "add", Path: "/metadata/annotations", Value: map[string]string{}},
+		{Op: "add", Path: "/metadata/annotations/sidecar-injected", Value: "true"},
 	})
 	if err != nil {
 		t.Fatalf("Failed to marshal expected patch: %v", err)
