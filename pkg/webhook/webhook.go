@@ -246,6 +246,11 @@ func (whs *WebhookServer) addVolume(target []corev1.Volume, added []corev1.Volum
 	return patch
 }
 
+// patchFriendly replaces any / with ~1 in a string for use in a JSON patch
+func patchFriendly(str string) string {
+	return strings.ReplaceAll(str, "/", "~1")
+}
+
 // updateAnnotations updates/adds annotations
 func (whs *WebhookServer) updateAnnotations(target map[string]string, added map[string]string) (patch []patchOperation) {
 
@@ -264,13 +269,13 @@ func (whs *WebhookServer) updateAnnotations(target map[string]string, added map[
 		if _, ok := target[key]; !ok {
 			patch = append(patch, patchOperation{
 				Op:    "add",
-				Path:  "/metadata/annotations/" + key,
+				Path:  "/metadata/annotations/" + patchFriendly(key),
 				Value: value,
 			})
 		} else {
 			patch = append(patch, patchOperation{
 				Op:    "replace",
-				Path:  "/metadata/annotations/" + key,
+				Path:  "/metadata/annotations/" + patchFriendly(key),
 				Value: value,
 			})
 		}
