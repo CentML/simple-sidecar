@@ -29,6 +29,6 @@ image:
   # -- Image repository
   repository: ghcr.io/centml/simple-sidecar
   # -- Image tag
-  tag: v1.0.2
+  tag: v1.0.4
   # -- Image pull policy for the deployment
   imagePullPolicy: Always
