@@ -246,17 +246,26 @@ func (whs *WebhookServer) addVolume(target []corev1.Volume, added []corev1.Volum
 	return patch
 }
 
-// updateAnnotation updates/adds annotations
-func (whs *WebhookServer) updateAnnotation(target map[string]string, added map[string]string) (patch []patchOperation) {
+// updateAnnotations updates/adds annotations
+func (whs *WebhookServer) updateAnnotations(target map[string]string, added map[string]string) (patch []patchOperation) {
+
+	// if there's no existing annotations, we need to start by creating an empty map
+	if target == nil {
+		target = map[string]string{}
+		patch = append(patch, patchOperation{
+			Op:    "add",
+			Path:  "/metadata/annotations",
+			Value: target,
+		})
+	}
+
+	// either add or replace the annotation depending on whether it already exists
 	for key, value := range added {
-		if target == nil || target[key] == "" {
-			target = map[string]string{}
+		if _, ok := target[key]; !ok {
 			patch = append(patch, patchOperation{
-				Op:   "add",
-				Path: "/metadata/annotations",
-				Value: map[string]string{
-					key: value,
-				},
+				Op:    "add",
+				Path:  "/metadata/annotations/" + key,
+				Value: value,
 			})
 		} else {
 			patch = append(patch, patchOperation{
@@ -353,7 +362,7 @@ func (whs *WebhookServer) createPatch(pod *corev1.Pod, sidecarConfig Config, ann
 	patch = append(patch, whs.addContainer(pod.Spec.InitContainers, sidecarConfig.InitContainers, "/spec/initContainers")...)
 	patch = append(patch, whs.addContainer(pod.Spec.Containers, sidecarConfig.Containers, "/spec/containers")...)
 	patch = append(patch, whs.addVolume(pod.Spec.Volumes, sidecarConfig.Volumes, "/spec/volumes")...)
-	patch = append(patch, whs.updateAnnotation(pod.Annotations, annotations)...)
+	patch = append(patch, whs.updateAnnotations(pod.Annotations, annotations)...)
 
 	return json.Marshal(patch)
 }
@@ -393,6 +402,7 @@ func (whs *WebhookServer) mutate(ar *admissionv1.AdmissionReview) *admissionv1.A
 		}
 	}
 
+	// add the status injected annotation and create the patch
 	annotations := map[string]string{admissionWebhookAnnotationStatusKey: "injected"}
 	patchBytes, err := whs.createPatch(&pod, config, annotations)
 	if err != nil {
