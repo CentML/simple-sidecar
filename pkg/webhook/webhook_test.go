@@ -490,6 +490,45 @@ func TestUpdateAnnotationsWithNonNilTargetAndExistingAnnotations(t *testing.T) {
 	}
 }
 
+// TestUpdateAnnotationsWithEscapedKeys tests the updateAnnotation method of the WebhookServer struct.
+// It verifies that the method correctly escapes annotation keys.
+func TestUpdateAnnotationsWithEscapedKeys(t *testing.T) {
+	whs := &WebhookServer{}
+
+	target := map[string]string{
+		"existing/annotation": "existing-value",
+	}
+
+	added := map[string]string{
+		"existing/annotation": "new-value",
+		"new/annotation":      "new-value",
+	}
+
+	patch := whs.updateAnnotations(target, added)
+
+	assert.Equal(t, 2, len(patch), "Expected 2 patch operations")
+
+	expectedPatches := map[string]patchOperation{
+		"/metadata/annotations/existing~1annotation": {
+			Op:    "replace",
+			Path:  "/metadata/annotations/existing~1annotation",
+			Value: "new-value",
+		},
+		"/metadata/annotations/new~1annotation": {
+			Op:    "add",
+			Path:  "/metadata/annotations/new~1annotation",
+			Value: "new-value",
+		},
+	}
+
+	for _, p := range patch {
+		expectedPatch, exists := expectedPatches[p.Path]
+		assert.True(t, exists, "Unexpected patch path: %s", p.Path)
+		assert.Equal(t, expectedPatch.Op, p.Op, "Unexpected operation for path: %s", p.Path)
+		assert.Equal(t, expectedPatch.Value, p.Value, "Unexpected value for path: %s", p.Path)
+	}
+}
+
 // Test case: Verify addVolumeMounts adds volume mounts to containers in a pod,
 // where some containers already have volume mounts and some do not.
 // Ensures 'volumeMounts' fields are created for containers without them
