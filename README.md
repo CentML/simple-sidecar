@@ -55,7 +55,9 @@ simpleSidecarConfig:
 Install the helm chart:
 
 ```sh
-helm install simple-sidecar ./charts/simple-sidecar -f values.yaml
+helm repo add simple-sidecar https://centml.github.io/simple-sidecar
+helm repo update
+helm install simple-sidecar simple-sidecar/simple-sidecar -f values.yaml
 ```
 
 Let's injected the ubuntu container into another container. First we need to create (or update) a namespace with the sidecar-injection label set to true:
