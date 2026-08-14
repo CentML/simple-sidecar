@@ -17,16 +17,16 @@ COPY pkg/ pkg/
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=${BUILDPLATFORM} go build -a -o simple-sidecar ./cmd
 
 
-FROM alpine:latest
-
-# install curl for prestop script
-RUN apk --no-cache add curl
+# OSRB-approved base; CGO_ENABLED=0 binary needs no libc. Already runs as
+# non-root (uid 1000), so the explicit USER is no longer required.
+#
+# curl dropped: no preStop hook or lifecycle block exists in this chart or in
+# the platform config that consumes it.
+FROM nvcr.io/nvidia/distroless/static:v4.0.0
 
 WORKDIR /
 
 # install binary
 COPY --from=builder /workspace/simple-sidecar .
-
-USER 65532:65532
 
 ENTRYPOINT ["/simple-sidecar"]
