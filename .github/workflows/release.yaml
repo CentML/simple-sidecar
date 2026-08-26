@@ -31,6 +31,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Login to NGC Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: nvcr.io
+          username: $oauthtoken
+          password: ${{ secrets.NGC_API_SECRET }}
+
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -47,6 +54,7 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:latest
             ghcr.io/${{ github.repository }}:${{ github.event.release.tag_name }}
+            nvcr.io/0808839837694695/simple-sidecar:${{ github.event.release.tag_name }}
           platforms: linux/amd64,linux/arm64
 
       - name: Logout from GitHub Container Registry
