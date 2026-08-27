@@ -21,6 +21,14 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
+      # The classic image store holds one arch per tag; containerd is needed
+      # for `load: true` to accept a multi-arch build.
+      - name: Enable containerd image store
+        run: |
+          sudo mkdir -p /etc/docker
+          echo '{"features":{"containerd-snapshotter":true}}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -30,13 +38,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Login to NGC Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: nvcr.io
-          username: $oauthtoken
-          password: ${{ secrets.NGC_API_SECRET }}
 
       - name: Cache Docker layers
         uses: actions/cache@v6
@@ -49,16 +50,32 @@ jobs:
       - name: Set lowercase image repository name
         run: echo "IMAGE_REPOSITORY=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
-      - name: Build and push Docker image
+      # Must run before the NGC login: a scoped NGC key 403s outside its own
+      # namespace rather than falling back to anonymous, breaking the base pull.
+      - name: Build image
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: true
+          push: false
+          load: true
           tags: |
             ghcr.io/${{ env.IMAGE_REPOSITORY }}:latest
             ghcr.io/${{ env.IMAGE_REPOSITORY }}:${{ github.event.release.tag_name }}
             nvcr.io/0808839837694695/simple-sidecar:${{ github.event.release.tag_name }}
           platforms: linux/amd64,linux/arm64
+
+      - name: Login to NGC Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: nvcr.io
+          username: $oauthtoken
+          password: ${{ secrets.NGC_API_SECRET }}
+
+      - name: Push images
+        run: |
+          docker push ghcr.io/${{ env.IMAGE_REPOSITORY }}:latest
+          docker push ghcr.io/${{ env.IMAGE_REPOSITORY }}:${{ github.event.release.tag_name }}
+          docker push nvcr.io/0808839837694695/simple-sidecar:${{ github.event.release.tag_name }}
 
       - name: Logout from GitHub Container Registry
         run: docker logout ghcr.io
