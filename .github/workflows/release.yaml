@@ -62,6 +62,7 @@ jobs:
             ghcr.io/${{ env.IMAGE_REPOSITORY }}:latest
             ghcr.io/${{ env.IMAGE_REPOSITORY }}:${{ github.event.release.tag_name }}
             nvcr.io/0808839837694695/simple-sidecar:${{ github.event.release.tag_name }}
+            nvcr.io/0808839837694695/simple-sidecar:latest
           platforms: linux/amd64,linux/arm64
 
       - name: Login to NGC Container Registry
@@ -76,6 +77,7 @@ jobs:
           docker push ghcr.io/${{ env.IMAGE_REPOSITORY }}:latest
           docker push ghcr.io/${{ env.IMAGE_REPOSITORY }}:${{ github.event.release.tag_name }}
           docker push nvcr.io/0808839837694695/simple-sidecar:${{ github.event.release.tag_name }}
+          docker push nvcr.io/0808839837694695/simple-sidecar:latest
 
       - name: Logout from GitHub Container Registry
         run: docker logout ghcr.io
