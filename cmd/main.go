@@ -1,3 +1,8 @@
+/*
+Portions derived from github.com/morvencao/kube-sidecar-injector (Apache License 2.0); modified by NVIDIA.
+SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+SPDX-License-Identifier: Apache-2.0
+*/
 package main
 
 import (
