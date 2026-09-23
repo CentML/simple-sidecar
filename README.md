@@ -1,6 +1,6 @@
 # Simple Sidecar (Injector)
 
-This repo was originally forked from [morvencao's kube-sidecar-injector](https://github.com/morvencao/kube-sidecar-injector). It's been productionized and turned into a simple generic Kubernetes sidecar injector (using a [Kubernetes MutatingAdmissionWebhook](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#mutatingadmissionwebhook)).
+This repo was originally forked from [morvencao's kube-sidecar-injector](https://github.com/morvencao/kube-sidecar-injector) (Apache License 2.0; see [THIRD-PARTY.txt](THIRD-PARTY.txt) for the derived files and all third-party notices). It's been productionized and turned into a simple generic Kubernetes sidecar injector (using a [Kubernetes MutatingAdmissionWebhook](https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/#mutatingadmissionwebhook)).
 
 
 ## Quick Start 
@@ -210,5 +210,12 @@ This let's you leverage functionality that might be provided by your injected co
 
 Follow the documentation related to [installing cert-manager](https://cert-manager.io/docs/) and then using it's [CA Injector functionality](https://cert-manager.io/docs/concepts/ca-injector/. 
 
-Setup a [self signed certificate](https://cert-manager.io/docs/configuration/selfsigned/) which will auto update to the secret location you've configured simple-sidecar to use. 
+Setup a [self signed certificate](https://cert-manager.io/docs/configuration/selfsigned/) which will auto update to the secret location you've configured simple-sidecar to use.
 
+## Contributing
+
+This project is currently not accepting contributions.
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE). Third-party notices: [THIRD-PARTY.txt](THIRD-PARTY.txt).
